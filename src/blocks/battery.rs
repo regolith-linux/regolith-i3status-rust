@@ -478,13 +478,16 @@ impl BatteryDevice for UpowerDevice {
 /// A block for displaying information about an internal power supply.
 pub struct Battery {
     id: usize,
+    update_request: Sender<Task>,
     output: TextWidget,
     update_interval: Duration,
-    device: Box<dyn BatteryDevice>,
+    device: String,
+    sys_device: Box<dyn BatteryDevice>,
     format: FormatTemplate,
     full_format: FormatTemplate,
     missing_format: FormatTemplate,
     allow_missing: bool,
+    rescan_if_missing: bool,
     hide_missing: bool,
     driver: BatteryDriver,
     full_threshold: u64,
@@ -552,6 +555,9 @@ pub struct BatteryConfig {
     /// If the battery device cannot be found, do not fail and show the block anyway (sysfs only).
     pub allow_missing: bool,
 
+    /// If the battery device cannot be found, atttempt to find it again, maybe it has a new name
+    pub rescan_if_missing: bool,
+
     /// If the battery device cannot be found, completely hide this block.
     pub hide_missing: bool,
 }
@@ -572,6 +578,22 @@ fn default_device() -> String {
     res
 }
 
+fn find_battery_device (driver: &BatteryDriver, device: &str, allow_missing: bool, id: usize, update_request: Sender<Task>) -> Result <Box<dyn BatteryDevice>> {
+    match driver {
+        BatteryDriver::Upower => {
+            let out = UpowerDevice::from_device(&device)?;
+            out.monitor(id, update_request);
+            Ok (Box::new(out))
+        },
+        BatteryDriver::Sysfs => {
+            let out = PowerSupplyDevice::from_device(
+            &device,
+            allow_missing)?;
+            Ok (Box::new(out))
+        }
+    }
+}
+
 impl Default for BatteryConfig {
     fn default() -> Self {
         Self {
@@ -587,6 +609,7 @@ impl Default for BatteryConfig {
             warning: 30,
             critical: 15,
             allow_missing: false,
+            rescan_if_missing: false,
             hide_missing: false,
         }
     }
@@ -601,17 +624,7 @@ impl ConfigBlock for Battery {
         shared_config: SharedConfig,
         update_request: Sender<Task>,
     ) -> Result<Self> {
-        let device: Box<dyn BatteryDevice> = match block_config.driver {
-            BatteryDriver::Upower => {
-                let out = UpowerDevice::from_device(&block_config.device)?;
-                out.monitor(id, update_request);
-                Box::new(out)
-            }
-            BatteryDriver::Sysfs => Box::new(PowerSupplyDevice::from_device(
-                &block_config.device,
-                block_config.allow_missing,
-            )?),
-        };
+        let device = find_battery_device(&block_config.driver, &block_config.device, block_config.allow_missing, id, update_request.clone())?;
 
         let fallback = match shared_config.get_icon("bat_10") {
             Ok(_) => false,
@@ -624,12 +637,15 @@ impl ConfigBlock for Battery {
         Ok(Battery {
             id,
             update_interval: block_config.interval,
+            update_request,
             output: TextWidget::new(id, 0, shared_config),
-            device,
+            device: String::from(block_config.device),
+            sys_device: device,
             format: block_config.format.with_default("{percentage}")?,
             full_format: block_config.full_format.with_default("")?,
             missing_format: block_config.missing_format.with_default("{percentage}")?,
             allow_missing: block_config.allow_missing,
+            rescan_if_missing: block_config.rescan_if_missing,
             hide_missing: block_config.hide_missing,
             driver: block_config.driver,
             full_threshold: block_config.full_threshold,
@@ -641,15 +657,23 @@ impl ConfigBlock for Battery {
             fallback_icons: fallback,
         })
     }
+
+
 }
 
 impl Block for Battery {
     fn update(&mut self) -> Result<Option<Update>> {
         // TODO: Maybe use dbus to immediately signal when the battery state changes.
 
+        // If the device doesn't exit but rescan_if_missing, attempt to find it with a different
+        // name
+        if !self.sys_device.is_available() && self.rescan_if_missing {
+            self.sys_device = find_battery_device(&self.driver, &self.device, self.allow_missing, self.id, self.update_request.clone())?;
+        }
+
         // Exit early, if the battery device went missing, but the user
         // allows this device to go missing.
-        if !self.device.is_available() && self.allow_missing {
+        if !self.sys_device.is_available() && self.allow_missing {
             // Respect the original format string, even if the battery
             // cannot be found right now.
             let values = map!(
@@ -670,22 +694,22 @@ impl Block for Battery {
 
         // The device may have gone missing
         // It may be a different battery now, thereby refresh the device specs.
-        self.device.refresh_device_info()?;
+        self.sys_device.refresh_device_info()?;
 
-        let status = self.device.status()?;
-        let capacity = self.device.capacity();
+        let status = self.sys_device.status()?;
+        let capacity = self.sys_device.capacity();
         let values = map!(
             "percentage" => match capacity {
                 Ok(capacity) => Value::from_integer(capacity as i64).percents(),
                 _ => Value::from_string("×".into()),
             },
-            "time" => match self.device.time_remaining() {
+            "time" => match self.sys_device.time_remaining() {
                 Ok(0) => Value::from_string("".into()),
                 Ok(time) => Value::from_string(format!("{}:{:02}", std::cmp::min(time / 60, 99), time % 60)),
                 _ => Value::from_string("×".into()),
             },
             // convert µW to W for display
-            "power" => match self.device.power_consumption() {
+            "power" => match self.sys_device.power_consumption() {
                 Ok(power) => Value::from_float(power as f64 * 1e-6).watts(),
                 _ => Value::from_string("×".into()),
             },
@@ -746,7 +770,7 @@ impl Block for Battery {
 
     fn view(&self) -> Vec<&dyn I3BarWidget> {
         // Don't display the block at all, if it's configured to be hidden on missing batteries
-        if !self.device.is_available() && self.hide_missing {
+        if !self.sys_device.is_available() && self.hide_missing {
             return Vec::new();
         }
 
