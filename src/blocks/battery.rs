@@ -67,10 +67,20 @@ impl PowerSupplyDevice {
     /// `/sys/class/power_supply` directory. Raises an error if the directory for
     /// that device cannot be found and `allow_missing` is `false`.
     pub fn from_device(device: &str, allow_missing: bool) -> Result<Self> {
-        let device_path = Path::new("/sys/class/power_supply").join(device);
-
+        let mut res = device.to_string();
+        let mut found = false;
+        if let Ok(dir) = std::fs::read_dir("/sys/class/power_supply") {
+            for entry in dir.flatten() {
+                if let Some(f) = entry.file_name().to_str() {
+                    if f.starts_with(device) && (!found || f < res.as_str()) {
+                        found = true;
+                        res = f.to_string();
+                    }
+                }
+            }
+        }
         let device = PowerSupplyDevice {
-            device_path,
+            device_path: Path::new("/sys/class/power_supply").join(res),
             allow_missing,
             charge_full: None,
             energy_full: None,
@@ -578,18 +588,22 @@ fn default_device() -> String {
     res
 }
 
-fn find_battery_device (driver: &BatteryDriver, device: &str, allow_missing: bool, id: usize, update_request: Sender<Task>) -> Result <Box<dyn BatteryDevice>> {
+fn find_battery_device(
+    driver: &BatteryDriver,
+    device: &str,
+    allow_missing: bool,
+    id: usize,
+    update_request: Sender<Task>,
+) -> Result<Box<dyn BatteryDevice>> {
     match driver {
         BatteryDriver::Upower => {
             let out = UpowerDevice::from_device(&device)?;
             out.monitor(id, update_request);
-            Ok (Box::new(out))
-        },
+            Ok(Box::new(out))
+        }
         BatteryDriver::Sysfs => {
-            let out = PowerSupplyDevice::from_device(
-            &device,
-            allow_missing)?;
-            Ok (Box::new(out))
+            let out = PowerSupplyDevice::from_device(&device, allow_missing)?;
+            Ok(Box::new(out))
         }
     }
 }
@@ -624,7 +638,13 @@ impl ConfigBlock for Battery {
         shared_config: SharedConfig,
         update_request: Sender<Task>,
     ) -> Result<Self> {
-        let device = find_battery_device(&block_config.driver, &block_config.device, block_config.allow_missing, id, update_request.clone())?;
+        let device = find_battery_device(
+            &block_config.driver,
+            &block_config.device,
+            block_config.allow_missing,
+            id,
+            update_request.clone(),
+        )?;
 
         let fallback = match shared_config.get_icon("bat_10") {
             Ok(_) => false,
@@ -657,8 +677,6 @@ impl ConfigBlock for Battery {
             fallback_icons: fallback,
         })
     }
-
-
 }
 
 impl Block for Battery {
@@ -668,7 +686,13 @@ impl Block for Battery {
         // If the device doesn't exit but rescan_if_missing, attempt to find it with a different
         // name
         if !self.sys_device.is_available() && self.rescan_if_missing {
-            self.sys_device = find_battery_device(&self.driver, &self.device, self.allow_missing, self.id, self.update_request.clone())?;
+            self.sys_device = find_battery_device(
+                &self.driver,
+                &self.device,
+                self.allow_missing,
+                self.id,
+                self.update_request.clone(),
+            )?;
         }
 
         // Exit early, if the battery device went missing, but the user
