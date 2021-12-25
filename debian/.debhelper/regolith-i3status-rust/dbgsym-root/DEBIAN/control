@@ -1,0 +1,12 @@
+Package: regolith-i3status-rust-dbgsym
+Source: regolith-i3status-rust
+Version: 0.20.8-1
+Auto-Built-Package: debug-symbols
+Architecture: amd64
+Maintainer: Carlos F. Sanz <carlos@sanz.dev>
+Installed-Size: 4540
+Depends: regolith-i3status-rust (= 0.20.8-1)
+Section: debug
+Priority: optional
+Description: debug symbols for regolith-i3status-rust
+Build-Ids: c3f1aaf38362c447ca8d7a9ba6cf4ec5e5c0a3ae

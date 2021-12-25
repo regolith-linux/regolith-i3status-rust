@@ -1,0 +1,5 @@
+regolith-i3status-rust (0.20.8-1) UNRELEASED; urgency=medium
+
+  * Initial release (Closes: #nnnn)  <nnnn is the bug number of your ITP>
+
+ -- Carlos F. Sanz <carlos@sanz.dev>  Sat, 25 Dec 2021 09:35:48 -0800

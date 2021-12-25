@@ -1,0 +1,18 @@
+Source: regolith-i3status-rust
+Section: utils
+Priority: optional
+Maintainer: Carlos F. Sanz <carlos@sanz.dev>
+Build-Depends: debhelper-compat (= 13), rustc, libdbus-1-dev, libpulse-dev
+Standards-Version: 4.6.0
+Homepage: https://github.com/greshake/i3status-rust
+#Vcs-Browser: https://salsa.debian.org/debian/regolith-i3status-rust
+#Vcs-Git: https://salsa.debian.org/debian/regolith-i3status-rust.git
+Rules-Requires-Root: no
+
+Package: regolith-i3status-rust
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: feature-rich and resource-friendly replacement for i3status.
+ i3status-rs is a feature-rich and resource-friendly replacement for i3status,
+ written in pure Rust. It provides a way to display "blocks" of system information
+ (time, battery status, volume, etc) on the i3 bar. It is also compatible with sway.
