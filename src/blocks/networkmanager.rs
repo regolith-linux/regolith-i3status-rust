@@ -20,6 +20,7 @@ use crate::errors::*;
 use crate::formatting::value::Value;
 use crate::formatting::FormatTemplate;
 use crate::scheduler::Task;
+use crate::util::escape_pango_text;
 use crate::widgets::text::TextWidget;
 use crate::widgets::{I3BarWidget, Spacing, State};
 
@@ -90,7 +91,7 @@ enum DeviceType {
     Wifi,
     Modem,
     Bridge,
-    TUN,
+    Tun,
     Wireguard,
 }
 
@@ -102,7 +103,7 @@ impl From<u32> for DeviceType {
             2 => DeviceType::Wifi,
             8 => DeviceType::Modem,
             13 => DeviceType::Bridge,
-            16 => DeviceType::TUN,
+            16 => DeviceType::Tun,
             29 => DeviceType::Wireguard,
             _ => DeviceType::Unknown,
         }
@@ -116,7 +117,7 @@ impl DeviceType {
             DeviceType::Wifi => Some("net_wireless".to_string()),
             DeviceType::Modem => Some("net_modem".to_string()),
             DeviceType::Bridge => Some("net_bridge".to_string()),
-            DeviceType::TUN => Some("net_bridge".to_string()),
+            DeviceType::Tun => Some("net_bridge".to_string()),
             DeviceType::Wireguard => Some("net_vpn".to_string()),
             _ => None,
         }
@@ -127,6 +128,7 @@ impl DeviceType {
 struct Ipv4Address {
     address: Ipv4Addr,
     prefix: u32,
+    #[allow(dead_code)]
     gateway: Ipv4Addr,
 }
 
@@ -491,6 +493,7 @@ pub struct NetworkManagerConfig {
     pub interface_name_include: Vec<String>,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for NetworkManagerConfig {
     fn default() -> Self {
         Self {
@@ -716,7 +719,7 @@ impl Block for NetworkManager {
                                     };
 
                                     let values = map!(
-                                        "ssid" => Value::from_string(ssid),
+                                        "ssid" => Value::from_string(escape_pango_text(&ssid)),
                                         "strength" => Value::from_integer(strength as i64).percents(),
                                         "freq" => Value::from_string(freq).percents(),
                                     );
