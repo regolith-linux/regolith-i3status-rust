@@ -2,7 +2,12 @@ Source: regolith-i3status-rust
 Section: utils
 Priority: optional
 Maintainer: Carlos F. Sanz <carlos@sanz.dev>
-Build-Depends: debhelper-compat (= 12), rustc, libdbus-1-dev, libpulse-dev
+Build-Depends:
+  cargo,
+  debhelper-compat (= 12),
+  libdbus-1-dev,
+  libpulse-dev,
+  rustc
 Standards-Version: 4.6.0
 Homepage: https://github.com/greshake/i3status-rust
 #Vcs-Browser: https://salsa.debian.org/debian/regolith-i3status-rust
