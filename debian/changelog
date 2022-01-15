@@ -1,5 +1,9 @@
-regolith-i3status-rust (0.20.8-1) UNRELEASED; urgency=medium
+regolith-i3status-rust (0.20.8-1) focal; urgency=medium
 
-  * Initial release (Closes: #nnnn)  <nnnn is the bug number of your ITP>
+  [ Carlos F. Sanz ]
+  * Initial release
 
- -- Carlos F. Sanz <carlos@sanz.dev>  Sat, 25 Dec 2021 09:35:48 -0800
+  [ Ken Gilmer ]
+  * Packaging file cleanup (test)
+
+ -- Regolith Linux <regolith.linux@gmail.com>  Sat, 15 Jan 2022 11:18:18 -0800
