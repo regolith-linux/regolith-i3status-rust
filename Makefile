@@ -1,7 +1,7 @@
 BIN 	= $(DESTDIR)/usr/bin
 
 build:
-	cargo build --release
+	cargo build
 
 install:
 	install -d $(BIN)
